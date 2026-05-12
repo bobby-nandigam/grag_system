@@ -411,11 +411,11 @@ MIT License — free for commercial and research use.
 ## 🌟 Citation
 
 ```bibtex
-@software{grag2024,
+@software{grag2026,
   title  = {GRAG: Graph Retrieval-Augmented Generation with RL Self-Improvement},
-  author = {GRAG Contributors},
-  year   = {2024},
-  url    = {https://github.com/yourusername/grag-system}
+  author = {Nandigam, Bobby},
+  year   = {2025},
+  url    = {https://github.com/bobby-nandigam/grag_system}
 }
 ```
 
