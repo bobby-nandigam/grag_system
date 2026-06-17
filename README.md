@@ -3,7 +3,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.8%2B-blue?style=flat-square&logo=python" alt="Python 3.8+" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License" />
-  <img src="https://img.shields.io/badge/version-1.0.0-orange?style=flat-square" alt="Version 1.1.0" />
+  <img src="https://img.shields.io/badge/version-1.1.0-orange?style=flat-square" alt="Version 1.1.0" />
   <img src="https://img.shields.io/badge/pip%20install-grag--system-purple?style=flat-square" alt="pip install grag-system" />
 </p>
 
