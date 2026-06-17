@@ -21,3 +21,11 @@ htmlcov/
 .grag_memory/
 *.json.bak
 .DS_Store
+site/
+build/
+dist/
+*.egg-info/
+__pycache__/
+.venv/
+.venv_verify/
+.DS_Store
