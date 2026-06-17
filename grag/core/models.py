@@ -29,6 +29,19 @@ class QueryParsed:
 
 
 @dataclass
+class Triple:
+    """A (subject, predicate, object) fact extracted from text."""
+    subject: str
+    predicate: str
+    obj: str
+    confidence: float = 0.6
+    source: str = "extracted"
+
+    def as_tuple(self) -> Tuple[str, str, str]:
+        return (self.subject, self.predicate, self.obj)
+
+
+@dataclass
 class RetrievedDocument:
     """A single retrieved document chunk."""
     doc_id: str

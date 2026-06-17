@@ -23,6 +23,7 @@ from grag.core.models import (
     GRAGAnswer, QueryParsed, FusedContext, FailureType, GraphPath
 )
 from grag.graph.knowledge_graph import KnowledgeGraph
+from grag.extraction.relation_extractor import RelationExtractor
 from grag.retrieval.hybrid_retriever import HybridRetriever
 from grag.retrieval.query_understanding import QueryUnderstanding
 from grag.reasoning.graph_reasoner import GraphReasoner
@@ -58,9 +59,17 @@ class GRAGPipeline:
         self,
         config: Optional[GRAGConfig] = None,
         knowledge_graph: Optional[KnowledgeGraph] = None,
+        relation_extractor: Optional[RelationExtractor] = None,
     ):
         self.config = config or GRAGConfig()
-        self.kg = knowledge_graph or KnowledgeGraph()
+        # A caller-supplied graph is used as-is; the default graph persists to disk
+        # alongside the memory store so facts survive across sessions.
+        self.kg = knowledge_graph or KnowledgeGraph(
+            path=f"{self.config.memory_path}/knowledge_graph.json"
+        )
+        # Turns ingested text into knowledge-graph triples. Swap in a custom
+        # (e.g. LLM-backed) extractor by passing one here.
+        self.relation_extractor = relation_extractor or RelationExtractor()
 
         # Initialize all modules
         self._query_understanding = QueryUnderstanding()
@@ -79,15 +88,29 @@ class GRAGPipeline:
 
         logger.info(f"GRAG Pipeline initialized | config={self.config}")
 
-    def add_documents(self, docs: List[Dict[str, Any]]) -> None:
+    def add_documents(
+        self,
+        docs: List[Dict[str, Any]],
+        extract_relations: bool = True,
+    ) -> int:
         """
-        Index documents into the vector store.
+        Index documents into the vector store and, by default, mine them for
+        knowledge-graph triples.
 
         Parameters
         ----------
         docs : list of dict
-            Each dict must have 'content' key.
-            Optional keys: 'source', 'metadata'.
+            Each dict must have a 'content' key. Optional keys: 'source', 'metadata'.
+        extract_relations : bool
+            When True (default), extract (subject, predicate, object) triples from
+            each document's text and add them to the knowledge graph, so retrieval
+            and graph reasoning both improve as documents arrive. Set False to index
+            for vector search only.
+
+        Returns
+        -------
+        int
+            Number of triples extracted and added to the knowledge graph.
 
         Example
         -------
@@ -97,7 +120,29 @@ class GRAGPipeline:
         ... ])
         """
         self._retriever.add_documents(docs)
-        logger.info(f"Indexed {len(docs)} documents.")
+
+        added = 0
+        if extract_relations:
+            added = self._extract_into_graph(docs)
+
+        logger.info(f"Indexed {len(docs)} documents | extracted {added} triples.")
+        return added
+
+    def _extract_into_graph(self, docs: List[Dict[str, Any]]) -> int:
+        """Extract triples from documents and upsert them into the knowledge graph."""
+        added = 0
+        for doc in docs:
+            source = doc.get("source", "extracted")
+            for triple in self.relation_extractor.extract(doc.get("content", "")):
+                self.kg.add_triple(
+                    triple.subject,
+                    triple.predicate,
+                    triple.obj,
+                    confidence=triple.confidence,
+                    source=source,
+                )
+                added += 1
+        return added
 
     def query(
         self,

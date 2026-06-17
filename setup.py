@@ -11,18 +11,18 @@ long_description = Path("README.md").read_text(encoding="utf-8")
 setup(
     name="grag-system",
     version="1.0.0",
-    author="GRAG Contributors",
-    author_email="grag@example.com",
+    author="Bobby Nandigam",
+    author_email="bobbynandigam.official@gmail.com",
     description=(
         "Production-grade Graph RAG system with RL self-improvement, "
         "multi-hop knowledge graph reasoning, and explainable AI outputs."
     ),
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/grag-system",
+    url="https://github.com/bobby-nandigam/grag_system",
     project_urls={
-        "Bug Tracker": "https://github.com/yourusername/grag-system/issues",
-        "Documentation": "https://github.com/yourusername/grag-system#readme",
+        "Bug Tracker": "https://github.com/bobby-nandigam/grag_system/issues",
+        "Documentation": "https://github.com/bobby-nandigam/grag_system#readme",
     },
     license="MIT",
     packages=find_packages(exclude=["tests*", "docs*", "examples*"]),

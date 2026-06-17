@@ -26,6 +26,13 @@ class KnowledgeGraph:
       - Subgraph extraction
       - Persistence (JSON)
 
+    Persistence
+    -----------
+    Pass ``path`` to load an existing graph on construction and auto-save after
+    every write, so facts survive across sessions:
+
+    >>> kg = KnowledgeGraph(path="state/knowledge_graph.json")
+
     Example
     -------
     >>> kg = KnowledgeGraph()
@@ -34,9 +41,13 @@ class KnowledgeGraph:
     >>> paths = kg.find_paths("Python", "Google", max_hops=2)
     """
 
-    def __init__(self):
+    def __init__(self, path: Optional[str] = None):
         self.graph = nx.MultiDiGraph()
         self._entity_index: Dict[str, Set[str]] = defaultdict(set)
+        self._path = path
+
+        if path and Path(path).exists():
+            self.load(path)
 
     def add_triple(
         self,
@@ -47,15 +58,37 @@ class KnowledgeGraph:
         source: str = "manual",
         recency: float = 1.0,
     ) -> None:
-        """Add a (subject, predicate, object) triple to the graph."""
+        """
+        Add a (subject, predicate, object) triple to the graph.
+
+        Idempotent: re-adding the same (subject, predicate, object) updates the
+        existing edge in place rather than creating a duplicate.
+        """
+        self._add_triple(subject, predicate, obj, confidence, source, recency)
+        if self._path:
+            self.save(self._path)
+
+    def _add_triple(
+        self,
+        subject: str,
+        predicate: str,
+        obj: str,
+        confidence: float = 1.0,
+        source: str = "manual",
+        recency: float = 1.0,
+    ) -> None:
+        """Insert/update a triple without triggering persistence."""
         subject = subject.strip().lower()
         obj = obj.strip().lower()
         predicate = predicate.strip().lower()
 
         self.graph.add_node(subject, label=subject)
         self.graph.add_node(obj, label=obj)
+        # Keying the edge by predicate makes repeated (subject, predicate, object)
+        # an in-place update instead of a duplicate parallel edge.
         self.graph.add_edge(
             subject, obj,
+            key=predicate,
             relation=predicate,
             confidence=confidence,
             source=source,
@@ -66,9 +99,11 @@ class KnowledgeGraph:
         logger.debug(f"Triple added: ({subject}) --[{predicate}]--> ({obj})")
 
     def add_triples_bulk(self, triples: List[Tuple[str, str, str]], **kwargs) -> None:
-        """Bulk-add a list of (subject, predicate, object) triples."""
+        """Bulk-add a list of (subject, predicate, object) triples (one save at the end)."""
         for s, p, o in triples:
-            self.add_triple(s, p, o, **kwargs)
+            self._add_triple(s, p, o, **kwargs)
+        if self._path:
+            self.save(self._path)
 
     def find_paths(
         self,
@@ -181,16 +216,41 @@ class KnowledgeGraph:
         }
 
     def save(self, path: str) -> None:
-        """Persist graph to JSON."""
-        data = nx.node_link_data(self.graph)
+        """
+        Persist the graph to JSON as a flat list of triples.
+
+        This format is independent of the installed NetworkX version (unlike
+        ``node_link_data``, whose default edge key changed across releases) and
+        round-trips cleanly through :meth:`load`.
+        """
+        triples = [
+            {
+                "subject": u,
+                "predicate": data.get("relation", key),
+                "object": v,
+                "confidence": data.get("confidence", 1.0),
+                "source": data.get("source", "manual"),
+                "recency": data.get("recency", 1.0),
+            }
+            for u, v, key, data in self.graph.edges(keys=True, data=True)
+        ]
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:
-            json.dump(data, f, indent=2)
-        logger.info(f"Graph saved to {path}")
+            json.dump({"triples": triples}, f, indent=2)
+        logger.info(f"Graph saved to {path} | {len(triples)} triples")
 
     def load(self, path: str) -> None:
-        """Load graph from JSON."""
+        """Load a graph previously written by :meth:`save`, rebuilding all indexes."""
         with open(path) as f:
             data = json.load(f)
-        self.graph = nx.node_link_graph(data, directed=True, multigraph=True)
+
+        self.graph = nx.MultiDiGraph()
+        self._entity_index = defaultdict(set)
+        for t in data.get("triples", []):
+            self._add_triple(
+                t["subject"], t["predicate"], t["object"],
+                confidence=t.get("confidence", 1.0),
+                source=t.get("source", "manual"),
+                recency=t.get("recency", 1.0),
+            )
         logger.info(f"Graph loaded from {path} | {self.stats()}")

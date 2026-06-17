@@ -72,8 +72,8 @@ def cmd_ingest(args):
     with open(args.file) as f:
         docs = json.load(f)
 
-    pipeline.add_documents(docs)
-    print(f"Ingested {len(docs)} documents.")
+    triples = pipeline.add_documents(docs)
+    print(f"Ingested {len(docs)} documents | extracted {triples} knowledge-graph triples.")
 
 
 def cmd_stats(args):

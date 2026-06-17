@@ -403,3 +403,80 @@ class TestGRAGPipeline:
         config = GRAGConfig.production()
         assert config.top_k == 10
         assert config.confidence_threshold >= 0.8
+
+
+# ─── RelationExtractor Tests ──────────────────────────────────────────────────
+
+from grag.extraction.relation_extractor import RelationExtractor
+
+
+class TestRelationExtractor:
+
+    @pytest.fixture
+    def rx(self):
+        # Force the deterministic regex backend so tests don't depend on spaCy.
+        return RelationExtractor(use_spacy=False)
+
+    def _triples(self, rx, text):
+        return {(t.subject, t.predicate, t.obj) for t in rx.extract(text)}
+
+    def test_passive_authorship(self, rx):
+        triples = self._triples(rx, "Python is a language created by Guido van Rossum.")
+        assert ("python", "created_by", "guido van rossum") in triples
+
+    def test_multiple_agents_split(self, rx):
+        triples = self._triples(rx, "Google was founded by Larry Page and Sergey Brin.")
+        assert ("google", "founded_by", "larry page") in triples
+        assert ("google", "founded_by", "sergey brin") in triples
+
+    def test_irregular_participle(self, rx):
+        triples = self._triples(rx, "PyTorch is a framework developed by Meta AI.")
+        assert ("pytorch", "developed_by", "meta ai") in triples
+
+    def test_direct_relation(self, rx):
+        triples = self._triples(rx, "NVIDIA produces GPUs and CUDA.")
+        assert ("nvidia", "produces", "gpus") in triples
+        assert ("nvidia", "produces", "cuda") in triples
+
+    def test_works_at(self, rx):
+        triples = self._triples(rx, "Guido van Rossum works at Google.")
+        assert ("guido van rossum", "works_at", "google") in triples
+
+    def test_founded_in_year(self, rx):
+        triples = self._triples(rx, "NVIDIA was founded in 1993.")
+        assert ("nvidia", "founded_in", "1993") in triples
+
+    def test_is_a_object_trimmed_before_clause(self, rx):
+        # The "created by ..." clause must not leak into the is_a object.
+        triples = self._triples(rx, "Python is a programming language created by Guido.")
+        is_a = {o for s, p, o in triples if p == "is_a"}
+        assert "programming language" in is_a
+
+    def test_empty_text(self, rx):
+        assert rx.extract("") == []
+        assert rx.extract("   ") == []
+
+    def test_min_confidence_filter(self):
+        rx = RelationExtractor(use_spacy=False, min_confidence=0.99)
+        assert rx.extract("Python was created by Guido.") == []
+
+
+class TestPipelineExtraction:
+
+    def test_add_documents_extracts_triples(self, config):
+        p = GRAGPipeline(config=config, relation_extractor=RelationExtractor(use_spacy=False))
+        added = p.add_documents([
+            {"content": "Python was created by Guido van Rossum.", "source": "chat"},
+        ])
+        assert added >= 1
+        assert p.kg.validate_relationship("python", "created_by", "guido van rossum") > 0
+
+    def test_extraction_can_be_disabled(self, config):
+        p = GRAGPipeline(config=config, relation_extractor=RelationExtractor(use_spacy=False))
+        before = p.kg.stats()["edges"]
+        added = p.add_documents(
+            [{"content": "Python was created by Guido van Rossum.", "source": "chat"}],
+            extract_relations=False,
+        )
+        assert added == 0
+        assert p.kg.stats()["edges"] == before
