@@ -1,0 +1,47 @@
+site_name: GRAG-System
+site_description: Production-grade Graph RAG with RL self-improvement and multi-hop reasoning
+site_author: Bobby Nandigam
+site_url: https://bobby-nandigam.github.io/grag_system/
+
+repo_name: bobby-nandigam/grag_system
+repo_url: https://github.com/bobby-nandigam/grag_system
+
+theme:
+  name: material
+
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: cyan
+
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.code.copy
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Quick Start: quickstart.md
+  - Architecture: architecture.md
+  - API: api.md
+  - RL Engine: rl.md
+  - Examples: examples.md
+  -  FAQ: faq.md
+  - Roadmap: roadmap.md
+  - Changelog: changelog.md
